@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const { User, Post, Vote, Comment } = require('../../models');
+const withAuth = require('../../utils/auth');
 
 // GET /api/users
 router.get('/', (req,res) =>  {
@@ -63,13 +64,24 @@ router.post('/', (req, res) => {
         email: req.body.email,
         password: req.body.password
     })
-    .then(dbUserData => res.json(dbUserData))
+    .then(dbUserData => {
+        req.session.user_id = dbUserData.id;
+        req.session.username = dbUserData.username;
+        req.session.loggedIn = true;
+
+        req.session.save(() => {
+            
+
+            res.json(dbUserData);
+        });
+    })
     .catch(err => {
         console.log(err);
         res.status(500).json(err);
     });
 });
 router.post('/login', (req,res) => {
+    console.log(req.body);
 // expects {email: 'lernantino@gmail.com', password: 'password1234'}
 User.findOne({
     where: {
@@ -88,12 +100,20 @@ User.findOne({
         res.status(400).json({message: 'Incorrect password!'});
         return; 
     }
+        req.session.user_id = dbUserData.id;
+        req.session.username = dbUserData.username;
+        req.session.loggedIn = true;
+    req.session.save(() => {
 
-    res.json({ user: dbUserData, message: 'You are now logged in!'});
+        // declare session variables
+        
+
+        res.json({ user: dbUserData, message: 'You are now logged in!'});
+    });
 });
 });
 // PUT /api/users/1
-router.put('/:id', (req, res) => {
+router.put('/:id', withAuth, (req, res) => {
     // expects {username: 'Lernantino', email: 'lernantino@gmail.com', password: 'password1234'}
 
     // if req.body has exact key/value pairs to match the model, you can just use req.body instead
@@ -117,7 +137,7 @@ router.put('/:id', (req, res) => {
 });
 
 // DELETE /api/users/1
-router.delete('/:id', (req,res) => {
+router.delete('/:id', withAuth, (req,res) => {
     User.destroy({
         where: {
             id: req.params.id
@@ -136,4 +156,14 @@ router.delete('/:id', (req,res) => {
     });
 });
 
+router.post('/logout', withAuth, (req, res) => {
+    if (req.session.loggedIn) {
+        req.session.destroy(() => {
+            res.status(204).end();
+        });
+    }
+    else {
+        res.status(404).end();
+    }
+})
 module.exports = router;
